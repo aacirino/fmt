@@ -55,7 +55,12 @@ TEST(ranges_test, format_vector2) {
 
 TEST(ranges_test, format_map) {
   auto m = std::map<std::string, int>{{"one", 1}, {"two", 2}};
-  EXPECT_EQ(fmt::format("{}", m), "[(\"one\", 1), (\"two\", 2)]");
+  EXPECT_EQ(fmt::format("{}", m), "{\"one\": 1, \"two\": 2}");
+}
+
+TEST(ranges_test, format_set) {
+  EXPECT_EQ(fmt::format("{}", std::set<std::string>{"one", "two"}),
+            "{\"one\", \"two\"}");
 }
 
 TEST(ranges_test, format_pair) {
@@ -190,7 +195,7 @@ TEST(ranges_test, range) {
   EXPECT_EQ(fmt::format("{}", z), "[0, 0, 0]");
 }
 
-enum class test_enum { foo };
+enum test_enum { foo };
 
 TEST(ranges_test, enum_range) {
   auto v = std::vector<test_enum>{test_enum::foo};
@@ -345,3 +350,14 @@ TEST(ranges_test, escape_string) {
               "[\"\\xf4\\x8f\\xbf\\xc0\"]");
   }
 }
+
+#ifdef FMT_USE_STRING_VIEW
+struct convertible_to_string_view {
+  operator std::string_view() const { return "foo"; }
+};
+
+TEST(ranges_test, escape_convertible_to_string_view) {
+  EXPECT_EQ(fmt::format("{}", std::vector<convertible_to_string_view>(1)),
+            "[\"foo\"]");
+}
+#endif  // FMT_USE_STRING_VIEW
