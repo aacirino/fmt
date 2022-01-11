@@ -907,6 +907,7 @@ inline uint64_t umul96_lower64(uint32_t x, uint64_t y) FMT_NOEXCEPT {
 // https://fmt.dev/papers/Grisu-Exact.pdf#page=5, section 3.4.
 inline int floor_log10_pow2(int e) FMT_NOEXCEPT {
   FMT_ASSERT(e <= 1700 && e >= -1700, "too large exponent");
+  static_assert((-1 >> 1) == -1, "right shift is not arithmetic");
   const int shift = 22;
   return (e * static_cast<int>(log10_2_significand >> (64 - shift))) >> shift;
 }
@@ -2573,6 +2574,12 @@ FMT_FUNC void format_system_error(detail::buffer<char>& out, int error_code,
 FMT_FUNC void report_system_error(int error_code,
                                   const char* message) FMT_NOEXCEPT {
   report_error(format_system_error, error_code, message);
+}
+
+// DEPRECATED!
+// This function is defined here and not inline for ABI compatiblity.
+FMT_FUNC void detail::error_handler::on_error(const char* message) {
+  throw_format_error(message);
 }
 
 FMT_FUNC std::string vformat(string_view fmt, format_args args) {

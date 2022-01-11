@@ -1,18 +1,18 @@
 module fmt {
-    requires cplusplus11
-    umbrella header "core.h"
-    header "args.h"
-    header "chrono.h"
-    header "color.h"
-    header "compile.h"
-    header "format-inl.h"
-    header "format.h"
-    header "locale.h"
-    header "os.h"
-    header "ostream.h"
-    header "printf.h"
-    header "ranges.h"
-    header "xchar.h"
-    link "spdlog"
-    export *
+  requires cplusplus20
+  header "args.h"
+  header "chrono.h"
+  header "color.h"
+  header "compile.h"
+  header "core.h"
+  header "format.h"
+  header "format-inl.h"
+  header "locale.h"
+  header "os.h"
+  header "ostream.h"
+  header "printf.h"
+  header "ranges.h"
+  header "xchar.h"
+  export *
+  link "fmt"
 }

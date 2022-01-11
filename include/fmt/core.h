@@ -17,7 +17,7 @@
 #include <type_traits>
 
 // The fmt library version in the form major * 10000 + minor * 100 + patch.
-#define FMT_VERSION 80001
+#define FMT_VERSION 80101
 
 #if defined(__clang__) && !defined(__ibmxl__)
 #  define FMT_CLANG_VERSION (__clang_major__ * 100 + __clang_minor__)
@@ -216,6 +216,20 @@
 #    define FMT_INLINE inline __attribute__((always_inline))
 #  else
 #    define FMT_INLINE inline
+#  endif
+#endif
+
+#ifndef FMT_DEPRECATED
+#  if FMT_HAS_CPP14_ATTRIBUTE(deprecated) || FMT_MSC_VER >= 1900
+#    define FMT_DEPRECATED [[deprecated]]
+#  else
+#    if (defined(__GNUC__) && !defined(__LCC__)) || defined(__clang__)
+#      define FMT_DEPRECATED __attribute__((deprecated))
+#    elif FMT_MSC_VER
+#      define FMT_DEPRECATED __declspec(deprecated)
+#    else
+#      define FMT_DEPRECATED /* deprecated */
+#    endif
 #  endif
 #endif
 
@@ -475,19 +489,19 @@ template <typename Char> class basic_string_view {
                                                       size_(s.size()) {}
 
   /** Returns a pointer to the string data. */
-  constexpr auto data() const -> const Char* { return data_; }
+  constexpr auto data() const FMT_NOEXCEPT -> const Char* { return data_; }
 
   /** Returns the string size. */
-  constexpr auto size() const -> size_t { return size_; }
+  constexpr auto size() const FMT_NOEXCEPT -> size_t { return size_; }
 
-  constexpr auto begin() const -> iterator { return data_; }
-  constexpr auto end() const -> iterator { return data_ + size_; }
+  constexpr auto begin() const FMT_NOEXCEPT -> iterator { return data_; }
+  constexpr auto end() const FMT_NOEXCEPT -> iterator { return data_ + size_; }
 
-  constexpr auto operator[](size_t pos) const -> const Char& {
+  constexpr auto operator[](size_t pos) const FMT_NOEXCEPT -> const Char& {
     return data_[pos];
   }
 
-  FMT_CONSTEXPR void remove_prefix(size_t n) {
+  FMT_CONSTEXPR void remove_prefix(size_t n) FMT_NOEXCEPT {
     data_ += n;
     size_ -= n;
   }
@@ -601,7 +615,7 @@ struct error_handler {
   constexpr error_handler(const error_handler&) = default;
 
   // This function is intentionally not constexpr to give a compile-time error.
-  void on_error(const char* message) { throw_format_error(message); }
+  FMT_NORETURN FMT_API void on_error(const char* message);
 };
 FMT_END_DETAIL_NAMESPACE
 
@@ -1373,17 +1387,20 @@ template <typename Context> struct arg_mapper {
   using cstring_result = conditional_t<std::is_same<char_type, char>::value,
                                        const char*, unformattable_pointer>;
 
-  FMT_CONSTEXPR FMT_INLINE auto map(const signed char* val) -> cstring_result {
-    return map(reinterpret_cast<const char*>(val));
-  }
-  FMT_CONSTEXPR FMT_INLINE auto map(const unsigned char* val)
+  FMT_DEPRECATED FMT_CONSTEXPR FMT_INLINE auto map(const signed char* val)
       -> cstring_result {
     return map(reinterpret_cast<const char*>(val));
   }
-  FMT_CONSTEXPR FMT_INLINE auto map(signed char* val) -> cstring_result {
+  FMT_DEPRECATED FMT_CONSTEXPR FMT_INLINE auto map(const unsigned char* val)
+      -> cstring_result {
     return map(reinterpret_cast<const char*>(val));
   }
-  FMT_CONSTEXPR FMT_INLINE auto map(unsigned char* val) -> cstring_result {
+  FMT_DEPRECATED FMT_CONSTEXPR FMT_INLINE auto map(signed char* val)
+      -> cstring_result {
+    return map(reinterpret_cast<const char*>(val));
+  }
+  FMT_DEPRECATED FMT_CONSTEXPR FMT_INLINE auto map(unsigned char* val)
+      -> cstring_result {
     return map(reinterpret_cast<const char*>(val));
   }
 
@@ -1496,16 +1513,12 @@ class appender : public std::back_insert_iterator<detail::buffer<char>> {
 
  public:
   using std::back_insert_iterator<detail::buffer<char>>::back_insert_iterator;
-  appender(base it) : base(it) {}
+  appender(base it) FMT_NOEXCEPT : base(it) {}
   using _Unchecked_type = appender;  // Mark iterator as checked.
 
-  auto operator++() -> appender& {
-    return *this;
-  }
+  auto operator++() FMT_NOEXCEPT -> appender& { return *this; }
 
-  auto operator++(int) -> appender {
-    return *this;
-  }
+  auto operator++(int) FMT_NOEXCEPT -> appender { return *this; }
 };
 
 // A formatting argument. It is a trivially copyable/constructible type to
