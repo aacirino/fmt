@@ -144,27 +144,8 @@
 #    define FMT_EXCEPTIONS 1
 #  endif
 #endif
-
-// Define FMT_USE_NOEXCEPT to make fmt use noexcept (C++11 feature).
-#ifndef FMT_USE_NOEXCEPT
-#  define FMT_USE_NOEXCEPT 0
-#endif
-
-#if FMT_USE_NOEXCEPT || FMT_HAS_FEATURE(cxx_noexcept) || \
-    FMT_GCC_VERSION >= 408 || FMT_MSC_VER >= 1900
-#  define FMT_DETECTED_NOEXCEPT noexcept
-#  define FMT_HAS_CXX11_NOEXCEPT 1
-#else
-#  define FMT_DETECTED_NOEXCEPT throw()
-#  define FMT_HAS_CXX11_NOEXCEPT 0
-#endif
-
 #ifndef FMT_NOEXCEPT
-#  if FMT_EXCEPTIONS || FMT_HAS_CXX11_NOEXCEPT
-#    define FMT_NOEXCEPT FMT_DETECTED_NOEXCEPT
-#  else
-#    define FMT_NOEXCEPT
-#  endif
+#  define FMT_NOEXCEPT noexcept
 #endif
 
 // [[noreturn]] is disabled on MSVC and NVCC because of bogus unreachable code
@@ -1417,10 +1398,11 @@ template <typename Context> struct arg_mapper {
   template <
       typename T,
       FMT_ENABLE_IF(
-          std::is_member_pointer<T>::value ||
+          std::is_pointer<T>::value || std::is_member_pointer<T>::value ||
           std::is_function<typename std::remove_pointer<T>::type>::value ||
           (std::is_convertible<const T&, const void*>::value &&
-           !std::is_convertible<const T&, const char_type*>::value))>
+           !std::is_convertible<const T&, const char_type*>::value &&
+           !has_formatter<T, Context>::value))>
   FMT_CONSTEXPR auto map(const T&) -> unformattable_pointer {
     return {};
   }
