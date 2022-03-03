@@ -223,21 +223,24 @@ template <typename Float> constexpr int num_significand_bits() {
 }
 
 // A floating-point number f * pow(2, e).
-struct fp {
-  uint64_t f;
+template <typename F> struct basic_fp {
+  F f;
   int e;
 
-  static constexpr const int num_significand_bits = bits<decltype(f)>::value;
+  static constexpr const int num_significand_bits = bits<F>::value;
 
-  constexpr fp() : f(0), e(0) {}
-  constexpr fp(uint64_t f_val, int e_val) : f(f_val), e(e_val) {}
+  constexpr basic_fp() : f(0), e(0) {}
+  constexpr basic_fp(uint64_t f_val, int e_val) : f(f_val), e(e_val) {}
 
   // Constructs fp from an IEEE754 floating-point number. It is a template to
   // prevent compile errors on systems where n is not IEEE754.
-  template <typename Float> explicit FMT_CONSTEXPR fp(Float n) { assign(n); }
+  template <typename Float> explicit FMT_CONSTEXPR basic_fp(Float n) {
+    assign(n);
+  }
 
   template <typename Float>
-  using is_supported = bool_constant<std::numeric_limits<Float>::digits <= 64>;
+  using is_supported = bool_constant<std::numeric_limits<Float>::is_iec559 &&
+                                     std::numeric_limits<Float>::digits <= 64>;
 
   // Assigns d to this and return true iff predecessor is closer than successor.
   template <typename Float, FMT_ENABLE_IF(is_supported<Float>::value)>
@@ -266,14 +269,14 @@ struct fp {
   }
 
   template <typename Float, FMT_ENABLE_IF(!is_supported<Float>::value)>
-  bool assign(Float) {
-    FMT_ASSERT(false, "");
-    return false;
-  }
+  bool assign(Float) = delete;
 };
 
+using fp = basic_fp<unsigned long long>;
+
 // Normalizes the value converted from double and multiplied by (1 << SHIFT).
-template <int SHIFT = 0> FMT_CONSTEXPR fp normalize(fp value) {
+template <int SHIFT = 0, typename F>
+FMT_CONSTEXPR basic_fp<F> normalize(basic_fp<F> value) {
   // Handle subnormals.
   const uint64_t implicit_bit = 1ULL << num_significand_bits<double>();
   const auto shifted_implicit_bit = implicit_bit << SHIFT;
@@ -289,7 +292,9 @@ template <int SHIFT = 0> FMT_CONSTEXPR fp normalize(fp value) {
   return value;
 }
 
-inline bool operator==(fp x, fp y) { return x.f == y.f && x.e == y.e; }
+template <typename F> inline bool operator==(basic_fp<F> x, basic_fp<F> y) {
+  return x.f == y.f && x.e == y.e;
+}
 
 // Computes lhs * rhs / pow(2, 64) rounded to nearest with half-up tie breaking.
 FMT_CONSTEXPR inline uint64_t multiply(uint64_t lhs, uint64_t rhs) {
@@ -2043,28 +2048,22 @@ small_divisor_case_label:
   // Add dist / 10^kappa to the significand.
   ret_value.significand += dist;
 
-  if (divisible_by_small_divisor) {
-    // Check z^(f) >= epsilon^(f).
-    // We have either yi == zi - epsiloni or yi == (zi - epsiloni) - 1,
-    // where yi == zi - epsiloni if and only if z^(f) >= epsilon^(f)
-    // Since there are only 2 possibilities, we only need to care about the
-    // parity. Also, zi and r should have the same parity since the divisor
-    // is an even number.
-    const typename cache_accessor<T>::compute_mul_parity_result y_mul =
-        cache_accessor<T>::compute_mul_parity(two_fc, cache, beta);
+  if (!divisible_by_small_divisor) return ret_value;
 
-    if (y_mul.parity != approx_y_parity) {
-      --ret_value.significand;
-    } else {
-      // If z^(f) >= epsilon^(f), we might have a tie
-      // when z^(f) == epsilon^(f), or equivalently, when y is an integer
-      if (y_mul.is_integer) {
-        ret_value.significand = ret_value.significand % 2 == 0
-                                    ? ret_value.significand
-                                    : ret_value.significand - 1;
-      }
-    }
-  }
+  // Check z^(f) >= epsilon^(f).
+  // We have either yi == zi - epsiloni or yi == (zi - epsiloni) - 1,
+  // where yi == zi - epsiloni if and only if z^(f) >= epsilon^(f).
+  // Since there are only 2 possibilities, we only need to care about the
+  // parity. Also, zi and r should have the same parity since the divisor
+  // is an even number.
+  const auto y_mul = cache_accessor<T>::compute_mul_parity(two_fc, cache, beta);
+
+  // If z^(f) >= epsilon^(f), we might have a tie when z^(f) == epsilon^(f),
+  // or equivalently, when y is an integer.
+  if (y_mul.parity != approx_y_parity)
+    --ret_value.significand;
+  else if (y_mul.is_integer && ret_value.significand % 2 != 0)
+    --ret_value.significand;
   return ret_value;
 }
 }  // namespace dragonbox
@@ -2206,9 +2205,13 @@ FMT_HEADER_ONLY_CONSTEXPR20 int format_float(Float value, int precision,
     return -precision;
   }
 
-  if (specs.fallback) return snprintf_float(value, precision, specs, buf);
-
-  if (!is_constant_evaluated() && precision < 0) {
+  int exp = 0;
+  bool use_dragon = true;
+  if (!is_fast_float<Float>()) {
+    // Use floor because 0.9 = 9e-1.
+    exp = static_cast<int>(std::floor(std::log10(value)));
+    if (fixed) adjust_precision(precision, exp + 1);
+  } else if (!is_constant_evaluated() && precision < 0) {
     // Use Dragonbox for the shortest format.
     if (specs.binary32) {
       auto dec = dragonbox::to_decimal(static_cast<float>(value));
@@ -2218,11 +2221,7 @@ FMT_HEADER_ONLY_CONSTEXPR20 int format_float(Float value, int precision,
     auto dec = dragonbox::to_decimal(static_cast<double>(value));
     write<char>(buffer_appender<char>(buf), dec.significand);
     return dec.exponent;
-  }
-
-  int exp = 0;
-  bool use_dragon = true;
-  if (is_fast_float<Float>()) {
+  } else {
     // Use Grisu + Dragon4 for the given precision:
     // https://www.cs.tufts.edu/~nr/cs257/archive/florian-loitsch/printf.pdf.
     const int min_exp = -60;  // alpha in Grisu.
@@ -2241,10 +2240,6 @@ FMT_HEADER_ONLY_CONSTEXPR20 int format_float(Float value, int precision,
       exp += handler.size - cached_exp10 - 1;
       precision = handler.precision;
     }
-  } else {
-    // Use floor because 0.9 = 9e-1.
-    exp = static_cast<int>(std::floor(std::log10(value)));
-    if (fixed) adjust_precision(precision, exp + 1);
   }
   if (use_dragon) {
     auto f = fp();

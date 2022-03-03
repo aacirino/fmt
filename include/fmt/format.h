@@ -389,7 +389,7 @@ template <typename To, typename From, FMT_ENABLE_IF(sizeof(To) > sizeof(From))>
 inline auto bit_cast(const From& from) -> To {
   constexpr auto size = static_cast<int>(sizeof(From) / sizeof(unsigned));
   struct data_t {
-    unsigned value[size];
+    unsigned value[static_cast<unsigned>(size)];
   } data = bit_cast<data_t>(from);
   auto result = To();
   if (const_check(is_big_endian())) {
@@ -775,6 +775,7 @@ class basic_memory_buffer final : public detail::buffer<T> {
       // Set pointer to the inline array so that delete is not called
       // when deallocating.
       other.set(other.store_, 0);
+      other.clear();
     }
     this->resize(size);
   }
@@ -1982,7 +1983,7 @@ inline auto write_significand(Char* out, UInt significand, int significand_size,
   int floating_size = significand_size - integral_size;
   for (int i = floating_size / 2; i > 0; --i) {
     out -= 2;
-    copy2(out, digits2(significand % 100));
+    copy2(out, digits2(static_cast<std::size_t>(significand % 100)));
     significand /= 100;
   }
   if (floating_size % 2 != 0) {
@@ -2100,8 +2101,9 @@ FMT_CONSTEXPR20 auto do_write_float(OutputIt out, const DecimalFP& fp,
       throw std::runtime_error("fuzz mode - avoiding excessive cpu use");
 #endif
     if (fspecs.showpoint) {
+      ++size;
       if (num_zeros <= 0 && fspecs.format != float_format::fixed) num_zeros = 1;
-      if (num_zeros > 0) size += to_unsigned(num_zeros) + 1;
+      if (num_zeros > 0) size += to_unsigned(num_zeros);
     }
     auto grouping = Grouping(loc, fspecs.locale);
     size += to_unsigned(grouping.count_separators(significand_size));
@@ -2259,8 +2261,6 @@ FMT_CONSTEXPR20 auto write(OutputIt out, T value,
     precision = 1;
   }
   if (const_check(std::is_same<T, float>())) fspecs.binary32 = true;
-  if (!std::numeric_limits<T>::is_iec559 || std::numeric_limits<T>::digits > 64)
-    fspecs.fallback = true;
   int exp = format_float(convert_float(value), precision, fspecs, buffer);
   fspecs.precision = precision;
   auto fp = big_decimal_fp{buffer.data(), static_cast<int>(buffer.size()), exp};
@@ -2270,9 +2270,8 @@ FMT_CONSTEXPR20 auto write(OutputIt out, T value,
 template <typename Char, typename OutputIt, typename T,
           FMT_ENABLE_IF(is_fast_float<T>::value)>
 FMT_CONSTEXPR20 auto write(OutputIt out, T value) -> OutputIt {
-  if (is_constant_evaluated()) {
+  if (is_constant_evaluated())
     return write(out, value, basic_format_specs<Char>());
-  }
 
   if (const_check(!is_supported_floating_point(value))) return out;
 
@@ -2354,8 +2353,7 @@ template <
             type::custom_type,
     FMT_ENABLE_IF(check)>
 FMT_CONSTEXPR auto write(OutputIt out, T value) -> OutputIt {
-  return write<Char>(
-      out, static_cast<typename std::underlying_type<T>::type>(value));
+  return write<Char>(out, static_cast<underlying_t<T>>(value));
 }
 
 template <typename Char, typename OutputIt, typename T,
@@ -2888,10 +2886,16 @@ template <typename T> auto ptr(const std::shared_ptr<T>& p) -> const void* {
   \endrst
  */
 template <typename Enum>
-constexpr auto underlying(Enum e) noexcept ->
-    typename std::underlying_type<Enum>::type {
-  return static_cast<typename std::underlying_type<Enum>::type>(e);
+constexpr auto underlying(Enum e) noexcept -> underlying_t<Enum> {
+  return static_cast<underlying_t<Enum>>(e);
 }
+
+namespace enums {
+template <typename Enum, FMT_ENABLE_IF(std::is_enum<Enum>::value)>
+constexpr auto format_as(Enum e) noexcept -> underlying_t<Enum> {
+  return static_cast<underlying_t<Enum>>(e);
+}
+}  // namespace enums
 
 #ifdef __cpp_lib_byte
 inline auto format_as(std::byte b) -> unsigned char { return underlying(b); }
