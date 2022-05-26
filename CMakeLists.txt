@@ -31,7 +31,10 @@ function(enable_module target)
       PRIVATE /interface /ifcOutput ${BMI}
       INTERFACE /reference fmt=${BMI})
   endif ()
-  set_target_properties(${target} PROPERTIES ADDITIONAL_CLEAN_FILES ${BMI})
+  set_target_properties(${target} PROPERTIES
+    VERSION ${FMT_VERSION} SOVERSION ${CPACK_PACKAGE_VERSION_MAJOR}
+    PUBLIC_HEADER "${FMT_HEADERS}"
+    DEBUG_POSTFIX "${FMT_DEBUG_POSTFIX}")
   set_source_files_properties(${BMI} PROPERTIES GENERATED ON)
 endfunction()
 
