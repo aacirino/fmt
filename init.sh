@@ -1,4 +1,4 @@
-cmake .. -GNinja -D CMAKE_BUILD_TYPE=Release \
+cmake -B build -GNinja -D CMAKE_BUILD_TYPE=Release \
     -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
     -D CMAKE_CXX_COMPILER:STRING=clang++ \
     -D CMAKE_CXX_FLAGS:STRING="-I$(brew --prefix)/opt/llvm/include -I$(brew --prefix)/opt/llvm/include/c++/v1 -I/usr/local/include -isystem $(brew --prefix)/opt/llvm/include/c++/v1/include -march=native -stdlib=libc++" \
@@ -8,4 +8,6 @@ cmake .. -GNinja -D CMAKE_BUILD_TYPE=Release \
     -D FMT_TEST:BOOL=ON \
     -D CMAKE_POSITION_INDEPENDENT_CODE=TRUE \
     -D FMT_MODULE:BOOL=ON \
-    -D CMAKE_INSTALL_INCLUDEDIR:PATH=include/fmt
+    -D CMAKE_INSTALL_INCLUDEDIR:PATH=include/fmt \
+    -D CMAKE_INSTALL_PREFIX:PATH=~ \
+    -D CMAKE_INSTALL_INCLUDEDIR:PATH=include
