@@ -1389,15 +1389,6 @@ struct chrono_format_checker : null_chrono_spec_handler<chrono_format_checker> {
 };
 
 template <typename T, FMT_ENABLE_IF(std::is_integral<T>::value)>
-inline bool isnan(T) {
-  return false;
-}
-template <typename T, FMT_ENABLE_IF(std::is_floating_point<T>::value)>
-inline bool isnan(T value) {
-  return std::isnan(value);
-}
-
-template <typename T, FMT_ENABLE_IF(std::is_integral<T>::value)>
 inline bool isfinite(T) {
   return true;
 }
@@ -1476,7 +1467,7 @@ inline std::chrono::duration<Rep, std::milli> get_milliseconds(
 // microseconds precision.
 template <long long Num, long long Den, int N = 0,
           bool Enabled =
-              (N < 19) && (Num <= std::numeric_limits<long long>::max() / 10)>
+              (N < 19) && (Num <= max_value<long long>() / 10)>
 struct count_fractional_digits {
   static constexpr int value =
       Num % Den == 0 ? N : count_fractional_digits<Num * 10, Den, N + 1>::value;

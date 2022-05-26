@@ -6,7 +6,7 @@
 // For the license information refer to format.h.
 
 // Disable bogus MSVC warnings.
-#ifndef _CRT_SECURE_NO_WARNINGS
+#if !defined(_CRT_SECURE_NO_WARNINGS) && defined(_MSC_VER)
 #  define _CRT_SECURE_NO_WARNINGS
 #endif
 
@@ -438,7 +438,7 @@ TEST(buffered_file_test, fileno_no_retry) {
   file::pipe(read_end, write_end);
   buffered_file f = read_end.fdopen("r");
   fileno_count = 1;
-  EXPECT_SYSTEM_ERROR((f.fileno)(), EINTR, "cannot get file descriptor");
+  EXPECT_SYSTEM_ERROR((f.descriptor)(), EINTR, "cannot get file descriptor");
   EXPECT_EQ(2, fileno_count);
   fileno_count = 0;
 }

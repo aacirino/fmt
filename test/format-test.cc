@@ -33,6 +33,7 @@ using fmt::memory_buffer;
 using fmt::runtime;
 using fmt::string_view;
 using fmt::detail::max_value;
+using fmt::detail::uint128_fallback;
 
 using testing::Return;
 using testing::StrictMock;
@@ -40,7 +41,6 @@ using testing::StrictMock;
 enum { buffer_size = 256 };
 
 TEST(uint128_test, ctor) {
-  using fmt::detail::uint128_fallback;
   auto n = uint128_fallback();
   EXPECT_EQ(n, 0);
   n = uint128_fallback(42);
@@ -49,7 +49,7 @@ TEST(uint128_test, ctor) {
 }
 
 TEST(uint128_test, shift) {
-  auto n = fmt::detail::uint128_fallback(42);
+  auto n = uint128_fallback(42);
   n = n << 64;
   EXPECT_EQ(static_cast<uint64_t>(n), 0);
   n = n >> 64;
@@ -62,8 +62,67 @@ TEST(uint128_test, shift) {
 }
 
 TEST(uint128_test, minus) {
-  auto n = fmt::detail::uint128_fallback(42);
+  auto n = uint128_fallback(42);
   EXPECT_EQ(n - 2, 40);
+}
+
+TEST(uint128_test, plus_assign) {
+  auto n = uint128_fallback(32);
+  n += uint128_fallback(10);
+  EXPECT_EQ(n, 42);
+  n = uint128_fallback(max_value<uint64_t>());
+  n += uint128_fallback(1);
+  EXPECT_EQ(n, uint128_fallback(1) << 64);
+}
+
+TEST(uint128_test, multiply) {
+  auto n = uint128_fallback(2251799813685247);
+  n = n * 3611864890;
+  EXPECT_EQ(static_cast<uint64_t>(n >> 64), 440901);
+}
+
+template <typename Float> void check_isfinite() {
+  using fmt::detail::isfinite;
+  EXPECT_TRUE(isfinite(Float(0.0)));
+  EXPECT_TRUE(isfinite(Float(42.0)));
+  EXPECT_TRUE(isfinite(Float(-42.0)));
+  EXPECT_TRUE(isfinite(Float(fmt::detail::max_value<double>())));
+  // Use double because std::numeric_limits is broken for __float128.
+  using limits = std::numeric_limits<double>;
+  FMT_CONSTEXPR20 auto result = isfinite(Float(limits::infinity()));
+  EXPECT_FALSE(result);
+  EXPECT_FALSE(isfinite(Float(limits::infinity())));
+  EXPECT_FALSE(isfinite(Float(-limits::infinity())));
+  EXPECT_FALSE(isfinite(Float(limits::quiet_NaN())));
+  EXPECT_FALSE(isfinite(Float(-limits::quiet_NaN())));
+}
+
+TEST(float_test, isfinite) {
+  check_isfinite<double>();
+#ifdef __SIZEOF_FLOAT128__
+  check_isfinite<fmt::detail::float128>();
+#endif
+}
+
+template <typename Float> void check_isnan() {
+  using fmt::detail::isnan;
+  EXPECT_FALSE(isnan(Float(0.0)));
+  EXPECT_FALSE(isnan(Float(42.0)));
+  EXPECT_FALSE(isnan(Float(-42.0)));
+  EXPECT_FALSE(isnan(Float(fmt::detail::max_value<double>())));
+  // Use double because std::numeric_limits is broken for __float128.
+  using limits = std::numeric_limits<double>;
+  EXPECT_FALSE(isnan(Float(limits::infinity())));
+  EXPECT_FALSE(isnan(Float(-limits::infinity())));
+  EXPECT_TRUE(isnan(Float(limits::quiet_NaN())));
+  EXPECT_TRUE(isnan(Float(-limits::quiet_NaN())));
+}
+
+TEST(float_test, isnan) {
+  check_isnan<double>();
+#ifdef __SIZEOF_FLOAT128__
+  check_isnan<fmt::detail::float128>();
+#endif
 }
 
 struct uint32_pair {
@@ -952,6 +1011,9 @@ TEST(format_test, precision) {
   if (std::numeric_limits<long double>::digits == 64) {
     auto ld = (std::numeric_limits<long double>::min)();
     EXPECT_EQ(fmt::format("{:.0}", ld), "3e-4932");
+    EXPECT_EQ(
+        fmt::format("{:0g}", std::numeric_limits<long double>::denorm_min()),
+        "3.6452e-4951");
   }
 
   EXPECT_EQ("123.", fmt::format("{:#.0f}", 123.0));
@@ -975,6 +1037,7 @@ TEST(format_test, precision) {
       format_error, "number is too big");
 
   EXPECT_EQ("st", fmt::format("{0:.2}", "str"));
+  EXPECT_EQ("вожык", fmt::format("{0:.5}", "вожыкі"));
 }
 
 TEST(format_test, runtime_precision) {
@@ -1265,32 +1328,30 @@ TEST(format_test, format_float) {
 }
 
 TEST(format_test, format_double) {
-  EXPECT_EQ("0", fmt::format("{}", 0.0));
+  EXPECT_EQ(fmt::format("{}", 0.0), "0");
   check_unknown_types(1.2, "eEfFgGaAnL%", "double");
-  EXPECT_EQ("0", fmt::format("{:}", 0.0));
-  EXPECT_EQ("0.000000", fmt::format("{:f}", 0.0));
-  EXPECT_EQ("0", fmt::format("{:g}", 0.0));
-  EXPECT_EQ("392.65", fmt::format("{:}", 392.65));
-  EXPECT_EQ("392.65", fmt::format("{:g}", 392.65));
-  EXPECT_EQ("392.65", fmt::format("{:G}", 392.65));
-  EXPECT_EQ("4.9014e+06", fmt::format("{:g}", 4.9014e6));
-  EXPECT_EQ("392.650000", fmt::format("{:f}", 392.65));
-  EXPECT_EQ("392.650000", fmt::format("{:F}", 392.65));
-  EXPECT_EQ("42", fmt::format("{:L}", 42.0));
-  EXPECT_EQ("    0x1.0cccccccccccdp+2", fmt::format("{:24a}", 4.2));
-  EXPECT_EQ("0x1.0cccccccccccdp+2    ", fmt::format("{:<24a}", 4.2));
+  EXPECT_EQ(fmt::format("{:}", 0.0), "0");
+  EXPECT_EQ(fmt::format("{:f}", 0.0), "0.000000");
+  EXPECT_EQ(fmt::format("{:g}", 0.0), "0");
+  EXPECT_EQ(fmt::format("{:}", 392.65), "392.65");
+  EXPECT_EQ(fmt::format("{:g}", 392.65), "392.65");
+  EXPECT_EQ(fmt::format("{:G}", 392.65), "392.65");
+  EXPECT_EQ(fmt::format("{:g}", 4.9014e6), "4.9014e+06");
+  EXPECT_EQ(fmt::format("{:f}", 392.65), "392.650000");
+  EXPECT_EQ(fmt::format("{:F}", 392.65), "392.650000");
+  EXPECT_EQ(fmt::format("{:L}", 42.0), "42");
+  EXPECT_EQ(fmt::format("{:24a}", 4.2), "    0x1.0cccccccccccdp+2");
+  EXPECT_EQ(fmt::format("{:<24a}", 4.2), "0x1.0cccccccccccdp+2    ");
+  EXPECT_EQ(fmt::format("{0:e}", 392.65), "3.926500e+02");
+  EXPECT_EQ(fmt::format("{0:E}", 392.65), "3.926500E+02");
+  EXPECT_EQ(fmt::format("{0:+010.4g}", 392.65), "+0000392.6");
   char buffer[buffer_size];
-  safe_sprintf(buffer, "%e", 392.65);
-  EXPECT_EQ(buffer, fmt::format("{0:e}", 392.65));
-  safe_sprintf(buffer, "%E", 392.65);
-  EXPECT_EQ(buffer, fmt::format("{0:E}", 392.65));
-  EXPECT_EQ("+0000392.6", fmt::format("{0:+010.4g}", 392.65));
   safe_sprintf(buffer, "%a", -42.0);
-  EXPECT_EQ(buffer, fmt::format("{:a}", -42.0));
+  EXPECT_EQ(fmt::format("{:a}", -42.0), buffer);
   safe_sprintf(buffer, "%A", -42.0);
-  EXPECT_EQ(buffer, fmt::format("{:A}", -42.0));
-  EXPECT_EQ("9223372036854775808.000000",
-            fmt::format("{:f}", 9223372036854775807.0));
+  EXPECT_EQ(fmt::format("{:A}", -42.0), buffer);
+  EXPECT_EQ(fmt::format("{:f}", 9223372036854775807.0),
+            "9223372036854775808.000000");
 }
 
 TEST(format_test, precision_rounding) {
@@ -1720,9 +1781,15 @@ TEST(format_test, join) {
 }
 
 #ifdef __cpp_lib_byte
+TEST(format_test, format_byte) {
+  using arg_mapper = fmt::detail::arg_mapper<fmt::format_context>;
+  EXPECT_EQ(arg_mapper().map(std::byte(42)), 42);
+  EXPECT_EQ(fmt::format("{}", std::byte(42)), "42");
+}
+
 TEST(format_test, join_bytes) {
   auto v = std::vector<std::byte>{std::byte(1), std::byte(2), std::byte(3)};
-  EXPECT_EQ("1, 2, 3", fmt::format("{}", fmt::join(v, ", ")));
+  EXPECT_EQ(fmt::format("{}", fmt::join(v, ", ")), "1, 2, 3");
 }
 #endif
 
@@ -1776,6 +1843,7 @@ TEST(format_test, compile_time_string) {
                                   "foo"_a = "foo"));
   EXPECT_EQ("", fmt::format(FMT_STRING("")));
   EXPECT_EQ("", fmt::format(FMT_STRING(""), "arg"_a = 42));
+  EXPECT_EQ("42", fmt::format(FMT_STRING("{answer}"), "answer"_a = Answer()));
 #endif
 
   (void)static_with_null;
@@ -1807,44 +1875,16 @@ TEST(format_test, custom_format_compile_time_string) {
 }
 
 #if FMT_USE_USER_DEFINED_LITERALS
-// Passing user-defined literals directly to EXPECT_EQ causes problems
-// with macro argument stringification (#) on some versions of GCC.
-// Workaround: Assing the UDL result to a variable before the macro.
-
-using namespace fmt::literals;
-
-#  if FMT_GCC_VERSION
-#    define FMT_CHECK_DEPRECATED_UDL_FORMAT 1
-#  elif FMT_CLANG_VERSION && defined(__has_warning)
-#    if __has_warning("-Wdeprecated-declarations")
-#      define FMT_CHECK_DEPRECATED_UDL_FORMAT 1
-#    endif
-#  endif
-#  ifndef FMT_CHECK_DEPRECATED_UDL_FORMAT
-#    define FMT_CHECK_DEPRECATED_UDL_FORMAT 0
-#  endif
-
-#  if FMT_CHECK_DEPRECATED_UDL_FORMAT
-#    pragma GCC diagnostic push
-#    pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-
-TEST(format_test, format_udl) {
-  EXPECT_EQ("{}c{}"_format("ab", 1), fmt::format("{}c{}", "ab", 1));
-  EXPECT_EQ("foo"_format(), "foo");
-  EXPECT_EQ("{0:10}"_format(42), "        42");
-  EXPECT_EQ("{}"_format(date(2015, 10, 21)), "2015-10-21");
-}
-
-#    pragma GCC diagnostic pop
-#  endif
-
 TEST(format_test, named_arg_udl) {
+  using namespace fmt::literals;
   auto udl_a = fmt::format("{first}{second}{first}{third}", "first"_a = "abra",
                            "second"_a = "cad", "third"_a = 99);
   EXPECT_EQ(
       fmt::format("{first}{second}{first}{third}", fmt::arg("first", "abra"),
                   fmt::arg("second", "cad"), fmt::arg("third", 99)),
       udl_a);
+
+  EXPECT_EQ("42", fmt::format("{answer}", "answer"_a = Answer()));
 }
 #endif  // FMT_USE_USER_DEFINED_LITERALS
 
@@ -2139,6 +2179,7 @@ TEST(format_test, format_string_errors) {
   fmt::print("warning: constexpr is broken in this version of MSVC\n");
 #  endif
 #  if FMT_USE_NONTYPE_TEMPLATE_PARAMETERS
+  using namespace fmt::literals;
   EXPECT_ERROR("{foo}", "named argument is not found", decltype("bar"_a = 42));
   EXPECT_ERROR("{foo}", "named argument is not found",
                decltype(fmt::arg("foo", 42)));

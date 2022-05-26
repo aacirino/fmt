@@ -10,6 +10,7 @@ module fmt {
   header "ostream.h"
   header "printf.h"
   header "ranges.h"
+  header "std.h"
   header "xchar.h"
   export *
 }
