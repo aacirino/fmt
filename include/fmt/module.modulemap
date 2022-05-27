@@ -1,11 +1,10 @@
 module fmt {
-  umbrella header "core.h"
+  header "core.h"
   header "args.h"
   header "chrono.h"
   header "color.h"
   header "compile.h"
   header "format.h"
-  header "format-inl.h"
   header "os.h"
   header "ostream.h"
   header "printf.h"
