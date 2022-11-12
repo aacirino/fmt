@@ -28,17 +28,9 @@ template FMT_API auto decimal_point_impl(locale_ref) -> char;
 
 template FMT_API void buffer<char>::append(const char*, const char*);
 
-// DEPRECATED!
-// There is no correspondent extern template in format.h because of
-// incompatibility between clang and gcc (#2377).
 template FMT_API void vformat_to(buffer<char>&, string_view,
                                  basic_format_args<FMT_BUFFER_CONTEXT(char)>,
                                  locale_ref);
-
-template FMT_API auto format_float(double, int, float_specs, buffer<char>&)
-    -> int;
-template FMT_API auto format_float(long double, int, detail::float_specs,
-                                   buffer<char>&) -> int;
 
 // Explicit instantiations for wchar_t.
 

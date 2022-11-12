@@ -12,9 +12,6 @@
 .. image:: https://github.com/fmtlib/fmt/workflows/windows/badge.svg
    :target: https://github.com/fmtlib/fmt/actions?query=workflow%3Awindows
 
-.. image:: https://ci.appveyor.com/api/projects/status/ehjkiefde6gucy1v?svg=true
-   :target: https://ci.appveyor.com/project/vitaut/fmt
-
 .. image:: https://oss-fuzz-build-logs.storage.googleapis.com/badges/fmt.svg
    :alt: fmt is continuously fuzzed at oss-fuzz
    :target: https://bugs.chromium.org/p/oss-fuzz/issues/list?\
@@ -325,8 +322,10 @@ Projects using this library
 
 * `ccache <https://ccache.dev/>`_: a compiler cache
 
-* `ClickHouse <https://github.com/ClickHouse/ClickHouse>`_: analytical database
+* `ClickHouse <https://github.com/ClickHouse/ClickHouse>`_: an analytical database
   management system
+  
+* `Contour <https://github.com/contour-terminal/contour/>`_: a modern terminal emulator
 
 * `CUAUV <https://cuauv.org/>`_: Cornell University's autonomous underwater
   vehicle
@@ -344,9 +343,12 @@ Projects using this library
 
 * `Folly <https://github.com/facebook/folly>`_: Facebook open-source library
 
+* `GemRB <https://gemrb.org/>`_: a portable open-source implementation of
+  Bioware’s Infinity Engine
+
 * `Grand Mountain Adventure
   <https://store.steampowered.com/app/1247360/Grand_Mountain_Adventure/>`_:
-  A beautiful open-world ski & snowboarding game
+  a beautiful open-world ski & snowboarding game
 
 * `HarpyWar/pvpgn <https://github.com/pvpgn/pvpgn-server>`_:
   Player vs Player Gaming Network with tweaks
@@ -359,6 +361,10 @@ Projects using this library
 * `Kodi <https://kodi.tv/>`_ (formerly xbmc): home theater software
 
 * `Knuth <https://kth.cash/>`_: high-performance Bitcoin full-node
+
+* `libunicode <https://github.com/contour-terminal/libunicode/>`_: a modern C++17 Unicode library
+
+* `MariaDB <https://mariadb.org/>`_: relational database management system
 
 * `Microsoft Verona <https://github.com/microsoft/verona>`_:
   research programming language for concurrent ownership
