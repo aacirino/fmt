@@ -12,4 +12,5 @@ module fmt {
   header "std.h"
   header "xchar.h"
   export *
+  link "fmt"
 }

@@ -1,13 +1,12 @@
-cmake -B build -GNinja -D CMAKE_BUILD_TYPE=Release \
+cmake -B build -GNinja \
+    -D CMAKE_BUILD_TYPE=Release \
+    -D BUILD_SHARED_LIBS:BOOL=TRUE \
     -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
     -D CMAKE_CXX_COMPILER:STRING=clang++ \
-    -D CMAKE_CXX_FLAGS:STRING="-I$(brew --prefix)/opt/llvm/include -I$(brew --prefix)/opt/llvm/include/c++/v1 -I/usr/local/include -isystem $(brew --prefix)/opt/llvm/include/c++/v1/include -march=native -stdlib=libc++" \
+    -D CMAKE_CXX_FLAGS:STRING="-I$(brew --prefix)/opt/llvm/include -I$(brew --prefix)/opt/llvm/include/c++/v1 -I/usr/local/include -isystem $(brew --prefix)/opt/llvm/include/c++/v1/include -march=native -stdlib=libc++ -D__cpp_modules" \
     -D CMAKE_EXE_LINKER_FLAGS:STRING="$LDFLAGS -fuse-ld=mold" \
     -D CMAKE_LINKER:FILEPATH=$(which mold) \
     -D CMAKE_CXX_STANDARD=20 \
     -D FMT_TEST:BOOL=OFF \
     -D CMAKE_POSITION_INDEPENDENT_CODE=TRUE \
-    -D FMT_MODULE:BOOL=ON \
-    -D CMAKE_INSTALL_INCLUDEDIR:PATH=include/fmt \
-    -D CMAKE_INSTALL_PREFIX:PATH=~ \
-    -D CMAKE_INSTALL_INCLUDEDIR:PATH=include
+    -D FMT_MODULE:BOOL=ON
